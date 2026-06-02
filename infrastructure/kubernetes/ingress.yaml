@@ -1,0 +1,111 @@
+# =============================================================================
+# VayuGuard - Kubernetes Ingress
+# =============================================================================
+# Path-based routing with TLS termination and WebSocket support
+# =============================================================================
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: vayuguard-ingress
+  namespace: vayuguard
+  annotations:
+    # NGINX ingress controller annotations
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/use-forwarded-headers: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+    # WebSocket support
+    nginx.ingress.kubernetes.io/websocket-services: "vayuguard-backend"
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+    nginx.ingress.kubernetes.io/upstream-hash-by: "$remote_addr"
+    # Rate limiting
+    nginx.ingress.kubernetes.io/limit-connections: "20"
+    nginx.ingress.kubernetes.io/limit-rps: "50"
+    # CORS headers
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "https://vayuguard.com,https://app.vayuguard.com"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "Authorization, Content-Type, X-Request-ID"
+    nginx.ingress.kubernetes.io/cors-max-age: "86400"
+spec:
+  tls:
+    - hosts:
+        - vayuguard.com
+        - app.vayuguard.com
+      secretName: vayuguard-tls-secret
+  rules:
+    # === Main domain routing ===
+    - host: app.vayuguard.com
+      http:
+        paths:
+          # ML API routes → ml-service
+          - path: /api/ml
+            pathType: Prefix
+            backend:
+              service:
+                name: vayuguard-ml-service
+                port:
+                  number: 8000
+          # Backend API routes → backend
+          - path: /api/v1
+            pathType: Prefix
+            backend:
+              service:
+                name: vayuguard-backend
+                port:
+                  number: 5000
+          # WebSocket connections → backend
+          - path: /ws
+            pathType: Prefix
+            backend:
+              service:
+                name: vayuguard-backend
+                port:
+                  number: 5000
+          # Health check endpoint → backend
+          - path: /healthz
+            pathType: Exact
+            backend:
+              service:
+                name: vayuguard-backend
+                port:
+                  number: 5000
+          # Default → frontend
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: vayuguard-frontend
+                port:
+                  number: 3000
+
+    # === Grafana monitoring subdomain ===
+    - host: monitoring.vayuguard.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: vayuguard-grafana
+                port:
+                  number: 3000
+
+    # === Prometheus subdomain ===
+    - host: prometheus.vayuguard.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: vayuguard-prometheus
+                port:
+                  number: 9090

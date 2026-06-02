@@ -1,0 +1,195 @@
+# =============================================================================
+# VayuGuard - Kubernetes Services
+# =============================================================================
+# ClusterIP services for internal communication between components
+# All services are internal-only; external access via Ingress
+# =============================================================================
+
+---
+# ===== Frontend Service =====
+apiVersion: v1
+kind: Service
+metadata:
+  name: vayuguard-frontend
+  namespace: vayuguard
+  labels:
+    app: vayuguard
+    component: frontend
+spec:
+  type: ClusterIP
+  selector:
+    app: vayuguard
+    component: frontend
+  ports:
+    - name: http
+      protocol: TCP
+      port: 3000
+      targetPort: 3000
+  sessionAffinity: None
+
+---
+# ===== Backend Service =====
+apiVersion: v1
+kind: Service
+metadata:
+  name: vayuguard-backend
+  namespace: vayuguard
+  labels:
+    app: vayuguard
+    component: backend
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "5000"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  selector:
+    app: vayuguard
+    component: backend
+  ports:
+    - name: http
+      protocol: TCP
+      port: 5000
+      targetPort: 5000
+    - name: metrics
+      protocol: TCP
+      port: 9090
+      targetPort: 5000
+  sessionAffinity: None
+
+---
+# ===== ML Service =====
+apiVersion: v1
+kind: Service
+metadata:
+  name: vayuguard-ml-service
+  namespace: vayuguard
+  labels:
+    app: vayuguard
+    component: ml-service
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8000"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  selector:
+    app: vayuguard
+    component: ml-service
+  ports:
+    - name: http
+      protocol: TCP
+      port: 8000
+      targetPort: 8000
+    - name: metrics
+      protocol: TCP
+      port: 9091
+      targetPort: 8000
+  sessionAffinity: None
+
+---
+# ===== MongoDB Service =====
+apiVersion: v1
+kind: Service
+metadata:
+  name: vayuguard-mongodb
+  namespace: vayuguard
+  labels:
+    app: vayuguard
+    component: mongodb
+spec:
+  type: ClusterIP
+  clusterIP: None  # Headless service for StatefulSet
+  selector:
+    app: vayuguard
+    component: mongodb
+  ports:
+    - name: mongodb
+      protocol: TCP
+      port: 27017
+      targetPort: 27017
+
+---
+# ===== PostgreSQL Service =====
+apiVersion: v1
+kind: Service
+metadata:
+  name: vayuguard-postgres
+  namespace: vayuguard
+  labels:
+    app: vayuguard
+    component: postgres
+spec:
+  type: ClusterIP
+  clusterIP: None  # Headless service for StatefulSet
+  selector:
+    app: vayuguard
+    component: postgres
+  ports:
+    - name: postgresql
+      protocol: TCP
+      port: 5432
+      targetPort: 5432
+
+---
+# ===== Redis Service =====
+apiVersion: v1
+kind: Service
+metadata:
+  name: vayuguard-redis
+  namespace: vayuguard
+  labels:
+    app: vayuguard
+    component: redis
+spec:
+  type: ClusterIP
+  selector:
+    app: vayuguard
+    component: redis
+  ports:
+    - name: redis
+      protocol: TCP
+      port: 6379
+      targetPort: 6379
+
+---
+# ===== Prometheus Service =====
+apiVersion: v1
+kind: Service
+metadata:
+  name: vayuguard-prometheus
+  namespace: vayuguard
+  labels:
+    app: vayuguard
+    component: prometheus
+spec:
+  type: ClusterIP
+  selector:
+    app: vayuguard
+    component: prometheus
+  ports:
+    - name: http
+      protocol: TCP
+      port: 9090
+      targetPort: 9090
+
+---
+# ===== Grafana Service =====
+apiVersion: v1
+kind: Service
+metadata:
+  name: vayuguard-grafana
+  namespace: vayuguard
+  labels:
+    app: vayuguard
+    component: grafana
+spec:
+  type: ClusterIP
+  selector:
+    app: vayuguard
+    component: grafana
+  ports:
+    - name: http
+      protocol: TCP
+      port: 3000
+      targetPort: 3000

@@ -1,0 +1,80 @@
+# =============================================================================
+# VayuGuard MERN Backend - Node 20 Alpine Express Service
+# =============================================================================
+# Optimized Node.js backend for API server with production hardening
+# =============================================================================
+
+# ---------- Build Stage ----------
+FROM node:20-alpine AS builder
+
+# Set working directory
+WORKDIR /app
+
+# Install build dependencies for native modules (bcrypt, etc.)
+RUN apk add --no-cache python3 make g++
+
+# Copy package manifests first for layer caching
+COPY package.json package-lock.json ./
+
+# Install production dependencies only
+RUN npm ci --only=production && \
+    npm cache clean --force
+
+# ---------- Runtime Stage ----------
+FROM node:20-alpine AS runtime
+
+# Metadata labels
+LABEL maintainer="VayuGuard DevOps <devops@vayuguard.com>"
+LABEL service="mern-backend"
+LABEL version="1.0.0"
+LABEL description="VayuGuard Express.js backend API service"
+
+# Install runtime dependencies and security updates
+RUN apk add --no-cache \
+    curl \
+    tini \
+    dumb-init \
+    && addgroup -g 1001 -S nodejs \
+    && adduser -S nodejs -u 1001 -G nodejs -h /app
+
+# Set working directory
+WORKDIR /app
+
+# Copy node_modules from builder
+COPY --from=builder /app/node_modules ./node_modules
+
+# Copy application source code
+COPY backend/ .
+
+# Create necessary directories
+RUN mkdir -p /app/logs /app/uploads /app/temp && \
+    chown -R nodejs:nodejs /app
+
+# Environment variables for backend configuration
+ENV NODE_ENV=production \
+    PORT=5000 \
+    HOST=0.0.0.0 \
+    LOG_LEVEL=info \
+    MONGODB_URI=mongodb://mongodb:27017/vayuguard \
+    REDIS_URL=redis://redis:6379 \
+    ML_SERVICE_URL=http://ml-service:8000 \
+    JWT_SECRET=changeme \
+    CORS_ORIGIN=http://localhost:3000 \
+    RATE_LIMIT_WINDOW_MS=60000 \
+    RATE_LIMIT_MAX=100
+
+# Expose the Express port
+EXPOSE 5000
+
+# Health check endpoint
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:5000/api/v1/health || exit 1
+
+# Switch to non-root user
+USER nodejs
+
+# Use tini as PID 1 for proper signal handling
+ENTRYPOINT ["tini", "--"]
+
+# Start the Express server with clustering
+CMD ["node", "--max-old-space-size=512", "server.js"]
